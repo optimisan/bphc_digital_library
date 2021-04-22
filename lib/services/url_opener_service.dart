@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'download_helper.dart';
 
-Future<Map<String, String>?> parseURL(String? link) async {
+Future<Map<String, String?>?> parseURL(String? link) async {
   if (link != null) {
     final regexp = RegExp(
         r'http:\/\/125.22.54.221:8080\/jspui\/(handle|bitstream|simple-search)\/?.+');
@@ -30,7 +30,8 @@ Future<Map<String, String>?> parseURL(String? link) async {
         return {
           'status': 'isDownloadLink',
           'message': 'Download ${paths[paths.length - 1]}?',
-          'folderName': Uri.decodeComponent(folderName ?? 'invalidFolder'),
+          'folderName':
+              folderName != null ? Uri.decodeComponent(folderName) : null,
         };
       } else if (paths[1] == 'simple-search') {
         return {'status': 'isASearch'};
@@ -165,9 +166,13 @@ Widget getAlertDialog(BuildContext context,
           child: Text("Download"),
           onPressed: () async {
             try {
+              link = link.replaceAll(RegExp(r'\?folder=.+$'), '');
+              print("Url is $link");
               await downloadFromURL(
                   link.replaceAll("http://125.22.54.221:8080", ''), context,
-                  folderName: controller.text.replaceAll('\n', ''));
+                  folderName: controller.text.trim() == ''
+                      ? 'Downloads'
+                      : controller.text.replaceAll('\n', ''));
               Navigator.of(context).pop();
               setState!();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(

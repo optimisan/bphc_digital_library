@@ -15,7 +15,7 @@ import 'history_share_service.dart';
 Future<void> downloadFromURL(String? url, BuildContext context,
     {required String? folderName}) async {
   final status = await Permission.storage.request();
-  if (status.isGranted && url != null) {
+  try {
     // final externalDir1 = await getExternalStorageDirectory();
     var externalDir;
     final prefs = await SharedPreferences.getInstance();
@@ -57,14 +57,19 @@ Future<void> downloadFromURL(String? url, BuildContext context,
     } catch (e) {
       logError(e.toString());
     }
-  } else {
-    print("Denied permission");
+  } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(
-              "Could not download: permission denied. Allow storage access and try again.")),
+      SnackBar(content: Text("Could not download: $e")),
     );
   }
+  // } else {
+  //   print("Denied permission");
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(
+  //         content: Text(
+  //             "Could not download: permission denied. Allow storage access and try again.")),
+  //   );
+  // }
 }
 
 Future<bool> checkInternet() async {

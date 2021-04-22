@@ -70,7 +70,7 @@
               <!-- Accepts URIs that begin with YOUR_SCHEME://YOUR_HOST -->
               <data
                 android:scheme="http"
-                android:host="125.22.54.221:8080" />
+                android:host="125.22.54.221" />
             </intent-filter>
             <!-- Deep links over -->
         </activity>

@@ -45,6 +45,19 @@ class CustomPopUpMenu extends StatelessWidget {
           ),
         ),
         const PopupMenuItem(
+          value: "Save online",
+          child: ListTile(
+            leading: Icon(
+              Icons.cloud_upload_rounded,
+              color: Colors.tealAccent,
+            ),
+            title: const Text(
+              "Save online",
+              style: const TextStyle(color: const Color(0xFFFEFEFE)),
+            ),
+          ),
+        ),
+        const PopupMenuItem(
           value: "Settings",
           child: ListTile(
             leading: Icon(
@@ -72,6 +85,9 @@ void _onMenuSelect(String value, BuildContext context) {
       break;
     case "Settings":
       showSettingsDialog(context);
+      break;
+    case "Save online":
+      sendToWeb(context);
   }
 }
 
