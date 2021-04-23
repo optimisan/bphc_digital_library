@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">-->
+    <!-- UIkit CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/uikit@3.6.20/dist/css/uikit.min.css"
+    />
+    <style>
+      .uk-card-title {
+        margin: 0 0px;
+        word-break: break-all;
+      }
+      .uk-card {
+        /* padding: 20px 10px; */
+        max-width: 380px;
+      }
+      ul {
+        margin-left: -30px;
+        margin-right: -30px;
+      }
+      li {
+        padding-left: 25px !important;
+      }
+
+      body {
+        /* background: rgb(12, 3, 27); */
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+        padding-bottom: 50px;
+        padding-left: 10px;
+      }
+      footer {
+        padding-left: 20px;
+      }
+      .flexbox {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-around;
+      }
+
+      main {
+        flex: 1 0 auto;
+      }
+    </style>
+
+    <title>BPHC Digital Library</title>
+  </head>
+  <body>
+    <main class="uk-dark">
+      <article class="uk-article">
+        <h1 class="uk-article-title">BPHC Digital Library - your files</h1>
+
+        <p class="uk-article-metak">
+          Your user id is 7448490. This link will remain the same every time you
+          save files from the app.
+        </p>
+        <div class="flexbox">
+          <div class="box">
+            <div class="uk-card uk-card-default uk-card-body">
+              <h3 class="uk-card-title">Default</h3>
+              <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
+            </div>
+          </div>
+          <div class="book">
+            <div class="uk-card uk-card-default uk-card-body">
+              <h3 class="uk-card-title">General%20Chemistry_2018-05</h3>
+              <span class="uk-label">2018-05</span>
+              <ul class="uk-list uk-list-striped">
+                <li>
+                  <a
+                    href="http://125.22.54.221:8080/jspui/bitstream/123456789/2518/3/Part%20II.docx?folder=General%20Chemistry_2018-05"
+                    target="_blank"
+                    >Part II.docx</a
+                  >
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <footer>
+      Note that your files can be deleted anytime without prior notice.
+    </footer>
+  </body>
+</html>

@@ -11,16 +11,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 Box<Map<dynamic, dynamic>>? historyBox;
 List<String> recentBookNames = [];
-bool webSaved = false;
 
 ///Adds the url and related file info to the history box.
 ///File name is grabbed from the url, so it is url encoded
 void addToHistory({required String title, required String url}) async {
-  webSaved = false;
+  _webUpdated(false);
   print(url);
   final uri = Uri.parse(url);
   final paths = uri.pathSegments;
-  final fileName = paths[paths.length - 1].replaceAll("%20", ' ');
+  final fileName = Uri.decodeComponent(paths[paths.length - 1]);
   historyBox = await Hive.openBox<Map<dynamic, dynamic>>("history");
   // if (historyBox != null) {
   //   historyBox = await Hive.openBox<Map<dynamic, dynamic>>("history");
@@ -39,9 +38,10 @@ void addToHistory({required String title, required String url}) async {
   });
 }
 
+/// Adds book to history, setting `isABook` to true.
 void addBookToHistory(String? url, String? bookName) async {
   if (url != null && bookName != null) {
-    print(bookName);
+    _webUpdated(false);
     if (!recentBookNames.contains(bookName)) {
       historyBox = await Hive.openBox<Map<dynamic, dynamic>>("history");
       var addThis = {
@@ -83,7 +83,10 @@ Future<String?> getHistory(bool asAppLinks, {bool forWeb = false}) async {
     if (historyBox!.length == 0) {
       return null;
     }
-    StringBuffer sb = new StringBuffer('My files from BPHC Digital Library:\n');
+    StringBuffer sb = new StringBuffer();
+    if (!forWeb) {
+      sb.write("My files from BPHC Library:");
+    }
     for (var i = 0; i < historyBox!.length; i++) {
       if (historyBox?.getAt(i)?['isABook'] == true.toString()) continue;
       final book = historyBox?.getAt(i)?['bookName'];
@@ -95,33 +98,48 @@ Future<String?> getHistory(bool asAppLinks, {bool forWeb = false}) async {
               .toString()
               .replaceAll("http://bphc.to?", '');
 
-      String str = "$book\n$name: $fileUrl\n\n";
-      if (forWeb) {
-        if (urlMap[book] != null) {
+      // String str = "$book\n$name: $fileUrl\n\n";
+      if (urlMap[book] != null) {
+        if (forWeb)
           urlMap[book]?.add('<a href="$fileUrl" target="_blank">$name</a>');
-        } else {
-          urlMap[book] = [];
+        else
+          urlMap[book]?.add('$name: $fileUrl');
+      } else {
+        urlMap[book] = [];
+        if (forWeb)
           urlMap[book]?.add('<a href="$fileUrl" target="_blank">$name</a>');
-        }
-        str =
-            "<br><b>$book</b><br><i>$name</i>: <a href = \"$fileUrl\" target=\"_blank\"> $fileUrl</a><br>";
+        else
+          urlMap[book]?.add('$name: $fileUrl');
       }
-      sb.write(str);
     }
     if (forWeb) {
-      sb.write("Last updated: ${DateTime.now()}");
+      // sb.write("Last updated: ${DateTime.now()}");
+      print(urlMap);
+      return shareForWeb(urlMap);
     } else
-      sb.write("\nShared using the BPHC Digital Library Mobile app");
-    return sb.toString();
+      return shareFormatted(urlMap, sb);
   }
+}
+
+String? shareFormatted(Map<String, List<String>> urlMap, StringBuffer sb) {
+  if (urlMap.length == 0) return null;
+  urlMap.forEach((bookName, fileList) {
+    sb.write('\n*$bookName\n');
+    for (String file in fileList) {
+      sb.write('$file\n');
+    }
+  });
+  return sb.toString();
 }
 
 ///Delete the file from history.
 ///Set `isABook` to true if deleting the whole book
 void deleteFromHistory(
     {required String bookName, String? fileName, bool isABook = false}) async {
+  _webUpdated(false);
+  bookName = Uri.encodeComponent(bookName);
   // fileName = fileName?.replaceAll("%20", ' ');
-  fileName = Uri.decodeComponent(fileName ?? 'error');
+  // fileName = Uri.decodeComponent(fileName ?? 'error');
   if (historyBox == null) {
     historyBox = await Hive.openBox<Map<dynamic, dynamic>>("history");
   }
@@ -138,7 +156,8 @@ void deleteFromHistory(
       //Delete the file if the bookName and fileName matches,
       //or delete it without looking at fileName if it is a book
       //that we are deleting
-      print(bookName + "is orig bookname");
+
+      print(bookName + "is orig bookname and ${file['bookName']} is saved");
       print(historyBox?.getAt(index));
       if (file['bookName'] == bookName &&
           (isABook || file['fileName'] == fileName)) {
@@ -151,6 +170,7 @@ void deleteFromHistory(
 
 ///Use for the `delete all` button.
 void deleteAllHistory() async {
+  _webUpdated(false);
   if (historyBox == null) {
     historyBox = await Hive.openBox<Map<dynamic, dynamic>>("history");
   }
@@ -166,7 +186,9 @@ class ShareBookData {
 }
 
 var response;
-Future<void> sendToWeb(BuildContext context) async {
+
+/// Upload contents to the web.
+Future<void> sendToWeb(BuildContext context, Function? loadingOver) async {
   String? urlReceived;
   final history = await getHistory(false, forWeb: true);
   if (history == null) {
@@ -178,26 +200,49 @@ Future<void> sendToWeb(BuildContext context) async {
       prefs.setInt('uid', randomNumber);
     }
     var url = Uri.parse('http://mirasma.ga/share-text.php');
-    if (webSaved == false) {
-      webSaved = true;
+    if (prefs.getBool('allowed to send to web') == true) {
+      _webUpdated(true);
       response = await post(url, body: {
         'data': history,
         'uid': prefs.getInt('uid').toString(),
+        'time': DateTime.now().toString(),
       });
       if (response.statusCode == 200) {
-        print(response.body);
-        showWebDialog(context, response.body);
+        loadingOver!(false);
+        showWebDialog(context, urlReceived: response.body);
         // return response.body;
       }
     } else {
-      showWebDialog(context, response.body);
+      loadingOver!(false);
+      showWebDialog(context, uid: prefs.getInt('uid').toString());
     }
 
     print("done post");
   }
 }
 
-void showWebDialog(BuildContext context, String? urlReceived) {
+///Returns the history as HTML to post to website
+String shareForWeb(Map<String, List<String>> m) {
+  StringBuffer sb = new StringBuffer();
+  final regex = RegExp(r'_\d+\-?.*');
+  m.forEach((bookName, fileList) {
+    final decoded = Uri.decodeComponent(bookName).replaceAll(regex, '');
+    final issueDate =
+        regex.firstMatch(bookName)?.group(0)?.replaceAll("_", '') ?? '';
+    sb.write('''<div><div class="uk-card uk-card-default uk-card-body">
+              <h3 class="uk-card-title">$decoded</h3>
+              <span class="uk-label">$issueDate</span>
+                 <ul class="uk-list uk-list-striped">''');
+    for (String file in fileList) {
+      sb.write('<li>$file</li>');
+    }
+    sb.writeln("</ul></div></div>");
+  });
+  sb.writeln('<p>Last updated: ${DateTime.now()}</p>');
+  return sb.toString();
+}
+
+void showWebDialog(BuildContext context, {String? urlReceived, String? uid}) {
   showBottomSheet(
       context: context,
       builder: (context) {
@@ -219,7 +264,7 @@ void showWebDialog(BuildContext context, String? urlReceived) {
                             fontWeight: FontWeight.w400,
                             fontSize: 16,
                           )),
-                      Text(urlReceived ?? 'Error',
+                      Text(urlReceived ?? 'http://mirasma.ga/bphc.php?uid=$uid',
                           style: TextStyle(fontWeight: FontWeight.w300)),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -279,4 +324,9 @@ class WebSave with ChangeNotifier {
     url = u;
     notifyListeners();
   }
+}
+
+void _webUpdated(bool val) async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  prefs.setBool('allowed to send to web', !val);
 }

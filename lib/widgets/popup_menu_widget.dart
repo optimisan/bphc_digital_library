@@ -4,15 +4,24 @@ import 'package:bphc_digital_library/services/history_share_service.dart';
 import 'package:bphc_digital_library/services/search_inputs.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
 import 'package:share/share.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+void Function(bool)? _showLoading;
+Function? _getUniLinks;
+
 class CustomPopUpMenu extends StatelessWidget {
+  const CustomPopUpMenu(this.showLoading, this.getUniLinks);
+  final void Function(bool) showLoading;
+  final Function getUniLinks;
   @override
   Widget build(BuildContext context) {
+    _showLoading = this.showLoading;
+    _getUniLinks = this.getUniLinks;
     return PopupMenuButton<String>(
       onSelected: (value) {
         _onMenuSelect(value, context);
@@ -58,6 +67,19 @@ class CustomPopUpMenu extends StatelessWidget {
           ),
         ),
         const PopupMenuItem(
+          value: "Open from link",
+          child: ListTile(
+            leading: Icon(
+              Icons.link,
+              color: Colors.tealAccent,
+            ),
+            title: const Text(
+              "Open from link",
+              style: const TextStyle(color: const Color(0xFFFEFEFE)),
+            ),
+          ),
+        ),
+        const PopupMenuItem(
           value: "Settings",
           child: ListTile(
             leading: Icon(
@@ -87,8 +109,62 @@ void _onMenuSelect(String value, BuildContext context) {
       showSettingsDialog(context);
       break;
     case "Save online":
-      sendToWeb(context);
+      _showLoading!(true);
+      sendToWeb(context, _showLoading);
+      break;
+    case "Open from link":
+      showLinkDialog(context);
   }
+}
+
+void showLinkDialog(BuildContext context) async {
+  ClipboardData? data = await Clipboard.getData('text/plain');
+  TextEditingController controller = TextEditingController(text: data?.text);
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text("Open from link"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              style: TextStyle(fontSize: 18.0),
+              maxLines: null,
+              decoration: InputDecoration(
+                fillColor: Color(0x557A7A7A),
+                filled: true,
+                focusColor: Colors.blueGrey,
+                contentPadding:
+                    EdgeInsets.symmetric(vertical: 12.0, horizontal: 18.0),
+                border: OutlineInputBorder(
+                  borderRadius: const BorderRadius.all(
+                    const Radius.circular(25.0),
+                  ),
+                ),
+                hintText: "http://125.22.54.221:8080...",
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              child: Text("Cancel"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              }),
+          TextButton(
+            child: Text("Open"),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _getUniLinks!(urlFromMenu: controller.text);
+            },
+          ),
+        ],
+      );
+    },
+  );
 }
 
 void showSettingsDialog(BuildContext context) async {
@@ -260,7 +336,7 @@ void showShareDialog(BuildContext context) {
                 ),
                 title: Text("Direct links"),
                 subtitle: Text(
-                    "Links as they appear on the website which will require a browser to open."),
+                    "Links as they appear on the website which can be opened by a browser. Communication apps might not detect and make these URLs clickable from their apps."),
                 onTap: () {
                   _shareAll(context, false);
                 },

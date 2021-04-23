@@ -186,19 +186,22 @@ class _HomePageState extends State<HomePage>
     getUniLinks();
   }
 
-  void showLoading() {
+  void showLoading(bool val) {
     WidgetsBinding.instance?.addPostFrameCallback((_) {
       setState(() {
-        linkOpened = true;
+        linkOpened = val;
       });
     });
   }
 
-  void getUniLinks() async {
+  void getUniLinks({String? urlFromMenu}) async {
     String? link = await initUniLinks();
-    if (link != null) {
-      showLoading();
-      link = link.replaceAll(RegExp(r"https?:\/\/bphc.to\/?\?"), '');
+    if (link != null || urlFromMenu != null) {
+      if (urlFromMenu != null) {
+        link = urlFromMenu;
+      }
+      showLoading(true);
+      link = link?.replaceAll(RegExp(r"https?:\/\/bphc.to\/?\?"), '');
       var urlResult = await parseURL(link);
       // print(isFileList);
       if (urlResult == null || urlResult['status'] == 'invalid') {
@@ -210,7 +213,10 @@ class _HomePageState extends State<HomePage>
               context: context,
               builder: (context) {
                 return AlertDialog(
-                  title: Text('Invalid URL'),
+                  title: Text(
+                    'Invalid URL',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
                   content: RichText(
                     textScaleFactor: 1.2,
                     text: TextSpan(text: "The URL ", children: [
@@ -244,7 +250,10 @@ class _HomePageState extends State<HomePage>
               context: context,
               builder: (context) {
                 return AlertDialog(
-                  title: Text('Error'),
+                  title: Text(
+                    'Error',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
                   content: RichText(
                     textScaleFactor: 1.2,
                     text: TextSpan(text: "The URL ", children: [
@@ -306,7 +315,7 @@ class _HomePageState extends State<HomePage>
               });
         });
       } else if (urlResult['status'] == 'isASearch') {
-        final uri = Uri.parse(link);
+        final uri = Uri.parse(link ?? '');
         final querySubject = uri.queryParameters['query'];
         WidgetsBinding.instance?.addPostFrameCallback((_) {
           setState(() {
@@ -321,7 +330,7 @@ class _HomePageState extends State<HomePage>
         //TODO: Implement collections
       } else {
         print("launching url");
-        final bookName = await getBookName(link);
+        final bookName = await getBookName(link ?? '');
         if (bookName != null) {
           linkOpened = false;
           await Navigator.of(context).push(MaterialPageRoute(
@@ -431,7 +440,7 @@ class _HomePageState extends State<HomePage>
           //     },
           //   ),
           // ),
-          CustomPopUpMenu(),
+          CustomPopUpMenu(showLoading, getUniLinks),
         ],
         bottom: TabBar(controller: _tabController, tabs: [
           Tab(text: "Library"),
