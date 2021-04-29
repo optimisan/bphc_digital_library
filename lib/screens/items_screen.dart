@@ -120,8 +120,6 @@ class _BookTileState extends State<BookTile> {
       padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 7),
       child: InkWell(
         onTap: () async {
-          // print('sdsd ${books[index].url} ' ?? "url is null");
-
           final showLibrary =
               await Navigator.of(context).push(MaterialPageRoute(
                   builder: (context) => BookListScreen(

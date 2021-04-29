@@ -8,16 +8,15 @@ import 'package:bphc_digital_library/constants.dart';
 import 'package:bphc_digital_library/services/download_helper.dart';
 import 'package:bphc_digital_library/services/error_logs_service.dart';
 import 'package:bphc_digital_library/services/history_share_service.dart';
-import 'package:bphc_digital_library/services/search_inputs.dart';
 import 'package:bphc_digital_library/services/search_results_service.dart';
 import 'package:bphc_digital_library/widgets/popup_menu_widget.dart';
 import 'package:open_file/open_file.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:html/parser.dart';
 import 'package:http/http.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 ReceivePort _receivePort = ReceivePort();
 Stream<dynamic>? _asBroadcast;
@@ -47,13 +46,19 @@ class BookListScreen extends StatefulWidget {
 }
 
 class _BookListScreenState extends State<BookListScreen> {
-  static void downloadCallback(
-      String id, DownloadTaskStatus status, int progress) {
+  DownloadingTasks? downloadingTasks;
+  static void downloadCallback0(String id, DownloadTaskStatus status, int progress) {
     final SendPort? sendPort = IsolateNameServer.lookupPortByName("downloader");
     if (sendPort != null) {
       print("Hello");
       sendPort.send([id, status, progress]);
     }
+  }
+
+  static void downloadCallback(String id, DownloadTaskStatus status, int progress) {
+    final SendPort? send = IsolateNameServer.lookupPortByName('downloader_send_port');
+    print("hi");
+    send?.send([id, status, progress]);
   }
 
   StreamSubscription<dynamic>? subscription;
@@ -67,15 +72,26 @@ class _BookListScreenState extends State<BookListScreen> {
     getExternalDir();
     goToLibrary = widget.toLibrary;
     url = widget.bookURL;
-    IsolateNameServer.registerPortWithName(_receivePort.sendPort, "downloader");
+    // IsolateNameServer.registerPortWithName(_receivePort.sendPort, "downloader");
     // _asBroadcast = _receivePort.asBroadcastStream();
     // var myStreamController = StreamController<dynamic>.broadcast();
     // myStreamController.stream.asBroadcastStream().listen((event) {})
+    IsolateNameServer.registerPortWithName(_receivePort.sendPort, 'downloader_send_port');
     if (widget.listenToPort)
-      subscription = _receivePort.listen((message) {
-        print(message[2].toString());
-        print("fwfsf");
+      _receivePort.listen((dynamic data) {
+        String id = data[0];
+        DownloadTaskStatus status = data[1];
+        int progress = data[2];
+        print("In UI isolate");
+        setState(() {
+          // downloadingTasks.updateDownloadWithIndex(index, value)
+        });
       });
+    // if (widget.listenToPort)
+    //   subscription = _receivePort.listen((message) {
+    //     print(message[2].toString());
+    //     print("fwfsf");
+    //   });
     FlutterDownloader.registerCallback(downloadCallback);
   }
 
@@ -83,7 +99,7 @@ class _BookListScreenState extends State<BookListScreen> {
   void dispose() {
     _receivePort.close();
     subscription?.cancel();
-    IsolateNameServer.removePortNameMapping('downloader');
+    IsolateNameServer.removePortNameMapping('downloader_send_port');
     super.dispose();
   }
 
@@ -103,11 +119,17 @@ class _BookListScreenState extends State<BookListScreen> {
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.hasError != true) {
             if (snapshot.data != null && snapshot.data?.length != 0) {
-              return ListView.builder(
-                itemBuilder: (context, index) {
-                  return BookListTile(bookItemData: snapshot.data?[index]);
+              return ChangeNotifierProvider<DownloadingTasks>(
+                create: (context) {
+                  downloadingTasks = DownloadingTasks(snapshot.data?.length ?? 0);
+                  return downloadingTasks ?? DownloadingTasks(snapshot.data?.length ?? 0);
                 },
-                itemCount: snapshot.data!.length,
+                builder: (context, _) => ListView.builder(
+                  itemBuilder: (context, index) {
+                    return BookListTile(bookItemData: snapshot.data?[index], index: index);
+                  },
+                  itemCount: snapshot.data!.length,
+                ),
               );
             } else {
               return Center(child: CircularProgressIndicator());
@@ -125,8 +147,10 @@ class BookListTile extends StatefulWidget {
   BookListTile({
     Key? key,
     required this.bookItemData,
+    required this.index,
   }) : super(key: key);
   final BookItemData? bookItemData;
+  final int index;
   @override
   _BookListTileState createState() => _BookListTileState();
 }
@@ -134,6 +158,7 @@ class BookListTile extends StatefulWidget {
 class _BookListTileState extends State<BookListTile> {
   DownloadTaskStatus? downloadStatus;
   int? downloadProgress;
+  bool clicked = false;
 
   // static void downloadCallback(
   //     String id, DownloadTaskStatus status, int progress) {
@@ -175,11 +200,12 @@ class _BookListTileState extends State<BookListTile> {
 
   @override
   Widget build(BuildContext context) {
-    final fileName =
-        Uri.encodeComponent(widget.bookItemData?.fileName ?? 'null');
+    final fileName = Uri.encodeComponent(widget.bookItemData?.fileName ?? 'null');
     final file = File('$externalDir/BPHC_Downloads/$folderNameTitle/$fileName');
     print('$externalDir/BPHC_Downloads/$folderNameTitle/$fileName');
     final fileExists = file.existsSync();
+    final bool isDownloading =
+        context.watch<DownloadingTasks>().currentDownloading.getVal(widget.index) ?? false;
     return ListTile(
       title: Text(widget.bookItemData?.fileName ?? "Error"),
       trailing: Row(
@@ -187,18 +213,11 @@ class _BookListTileState extends State<BookListTile> {
         children: [
           Text(widget.bookItemData?.size ?? "Error"),
           SizedBox(width: 7.0),
-          fileExists ? Icon(Icons.check_sharp) : Icon(Icons.download_rounded),
+          fileExists || isDownloading ? Icon(Icons.check_sharp) : Icon(Icons.download_rounded),
         ],
       ),
       onTap: () async {
-        print(widget.bookItemData?.downloadURL ?? "null url");
-        print(
-            '$externalDir/BPHC_Downloads/$folderNameTitle/${widget.bookItemData?.fileName}');
-        final file =
-            File('$externalDir/BPHC_Downloads/$folderNameTitle/$fileName');
-        // final files = Directory('$externalDir/BPHC_Downloads/$folderNameTitle')
-        //     .listSync();
-        // print(files.contains(file));
+        final file = File('$externalDir/BPHC_Downloads/$folderNameTitle/$fileName');
         if (file.existsSync()) {
           OpenFile.open(file.path);
         } else {
@@ -212,18 +231,25 @@ class _BookListTileState extends State<BookListTile> {
               await downloadFromURL(widget.bookItemData?.downloadURL, context,
                   folderName: folderNameTitle);
               addBookToHistory(url, folderNameTitle);
+              setState(() {
+                this.clicked = true;
+              });
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: const Text("Download started."),
                 action: SnackBarAction(
                   label: "Show",
                   onPressed: () {
-                    if (mounted) {
-                      try {
-                        Navigator.pop(context, folderNameTitle);
-                      } catch (e) {
+                    try {
+                      if (mounted) {
+                        try {
+                          Navigator.pop(context, folderNameTitle);
+                        } catch (e) {
+                          goToLibrary!(folderNameTitle);
+                        }
+                      } else {
                         goToLibrary!(folderNameTitle);
                       }
-                    } else {
+                    } catch (e) {
                       goToLibrary!(folderNameTitle);
                     }
                   },
@@ -258,11 +284,30 @@ class _BookListTileState extends State<BookListTile> {
   }
 }
 
+class DownloadingTasks with ChangeNotifier {
+  DownloadingTasks(int length) : currentDownloading = List.filled(length, false);
+
+  List<bool> currentDownloading;
+  void updateDownloadWithIndex(int index, bool value) {
+    currentDownloading[index] = value;
+    notifyListeners();
+  }
+}
+
+extension ListGetter<bool> on List<bool> {
+  bool? getVal(int index) {
+    try {
+      return this[index];
+    } catch (e) {
+      return null;
+    }
+  }
+}
+
 Future<List<BookItemData>?> parseBody(String? url) async {
   List<BookItemData> bookItems = [];
   url = url?.replaceAll("http://125.22.54.221:8080", '');
-  final response =
-      await Client().get(Uri.parse('http://125.22.54.221:8080$url'));
+  final response = await Client().get(Uri.parse('http://125.22.54.221:8080$url'));
   if (response.statusCode == 200) {
     var document = parse(response.body);
     if (document.getElementsByTagName("table").length == 0) {
@@ -273,17 +318,11 @@ Future<List<BookItemData>?> parseBody(String? url) async {
         .getElementsByTagName("tbody")[0]
         .getElementsByTagName("tr");
     for (var i = 1; i < table.length; i++) {
-      var fileName = table[i]
-          .getElementsByTagName("td")[0]
-          .getElementsByTagName("a")[0]
-          .innerHtml;
+      var fileName = table[i].getElementsByTagName("td")[0].getElementsByTagName("a")[0].innerHtml;
       var size = table[i].getElementsByTagName("td")[2].innerHtml;
-      var itemURL = table[i]
-          .getElementsByTagName("td")[0]
-          .getElementsByTagName("a")[0]
-          .attributes['href'];
-      bookItems.add(
-          BookItemData(fileName: fileName, size: size, downloadURL: itemURL));
+      var itemURL =
+          table[i].getElementsByTagName("td")[0].getElementsByTagName("a")[0].attributes['href'];
+      bookItems.add(BookItemData(fileName: fileName, size: size, downloadURL: itemURL));
     }
     return Future.value(bookItems);
   }

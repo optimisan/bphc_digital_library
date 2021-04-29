@@ -279,8 +279,9 @@ void showWebDialog(BuildContext context, {String? urlReceived, String? uid}) {
                           OutlinedButton(
                             style: OutlinedButton.styleFrom(),
                             onPressed: () {
-                              Clipboard.setData(
-                                  ClipboardData(text: urlReceived));
+                              Clipboard.setData(ClipboardData(
+                                  text: urlReceived ??
+                                      'http://mirasma.ga/bphc.php?uid=$uid'));
                               ScaffoldMessenger.of(context)
                                   .showSnackBar(SnackBar(
                                 content: Text("Copied!"),
@@ -291,7 +292,10 @@ void showWebDialog(BuildContext context, {String? urlReceived, String? uid}) {
                           OutlinedButton(
                             style: OutlinedButton.styleFrom(),
                             onPressed: () {
-                              if (urlReceived != null) launch(urlReceived);
+                              if (urlReceived != null)
+                                launch(urlReceived);
+                              else
+                                launch('http://mirasma.ga/bphc.php?uid=$uid');
                             },
                             child: Text("Open link"),
                           ),

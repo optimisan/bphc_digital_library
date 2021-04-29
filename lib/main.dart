@@ -1,15 +1,18 @@
 import 'dart:io';
 
 import 'package:android_path_provider/android_path_provider.dart';
+import 'package:bphc_digital_library/announcements/screens/display_message_screen.dart';
+import 'package:bphc_digital_library/announcements/screens/messages_screen.dart';
+import 'package:bphc_digital_library/screen_provider.dart';
 import 'package:bphc_digital_library/screens/book_list_screen.dart';
 import 'package:bphc_digital_library/screens/search_screen.dart';
-import 'package:bphc_digital_library/services/history_share_service.dart';
+import 'package:bphc_digital_library/services/firebase_messaging_service.dart';
 import 'package:bphc_digital_library/services/search_inputs.dart';
-import 'package:bphc_digital_library/widgets/popup_menu_widget.dart';
-import 'package:flutter/gestures.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive/hive.dart';
-import 'package:http/http.dart';
 import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
 import 'package:bphc_digital_library/services/url_opener_service.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,6 +25,8 @@ import 'package:flutter/material.dart';
 import 'package:uni_links2/uni_links.dart';
 import 'package:flutter/services.dart' show PlatformException;
 
+import 'widgets/side_drawer_widget.dart';
+
 late final String externalDir;
 late SharedPreferences prefs;
 
@@ -31,6 +36,12 @@ void main() async {
     await FlutterDownloader.initialize(
         debug: true // optional: set false to disable printing logs to console
         );
+    // Set the background messaging handler early on, as a named top-level function
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
     // Directory appDocDirectory = await getApplicationDocumentsDirectory();
     // final externalDir = await getExternalStorageDirectory();
     prefs = await SharedPreferences.getInstance();
@@ -51,8 +62,11 @@ void main() async {
     }
     final appDocumentDir = await getApplicationDocumentsDirectory();
     Hive.init(appDocumentDir.path);
+
     // if (externalDir != null)
     // await Directory('$externalDir/BPHC_Downloads').create();
+    //
+    //
     runApp(MyApp());
   } catch (e) {
     runApp(FailScreen(e.toString()));
@@ -100,7 +114,31 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     _tabController = TabController(vsync: this, length: 3);
+    var sett = AndroidInitializationSettings('@mipmap/ic_launcher');
+    var sett2 = InitializationSettings(android: sett);
+    flutterLocalNotificationsPlugin.initialize(sett2);
+
     FlutterDownloader.registerCallback(downloadCallback);
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+      if (notification != null && android != null) {
+        flutterLocalNotificationsPlugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                channel.id,
+                channel.name,
+                channel.description,
+                // TODO add a proper drawable resource to android, for now using
+                //      one that already exists in example app.
+                icon: '@mipmap/ic_launcher', //launch_background
+              ),
+            ));
+      }
+    });
   }
 
   @override
@@ -109,58 +147,39 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  void _onEnter() {
-    _tabController.animateTo(2);
-  }
-
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<SearchInputs>(
       create: (BuildContext context) => SearchInputs(externalDir),
       builder: (context, _) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'Digital Library',
-          theme: ThemeData.dark(),
-          home: HomePage(),
-          // home: Scaffold(
-          //   backgroundColor: Color(0xFF000216),
-          //   appBar: AppBar(
-          //     automaticallyImplyLeading: false,
-          //     title: Text("  BPHC Digital Library"),
-          //     backgroundColor: Colors.transparent,
-          //     elevation: 0.0,
-          //     actions: [
-          //       Padding(
-          //         padding: const EdgeInsets.only(right: 12.0),
-          //         child: IconButton(
-          //           icon: Icon(Icons.info_outline_rounded),
-          //           onPressed: () {
-          //             infoDialog(context);
-          //           },
-          //         ),
-          //       )
-          //     ],
-          //     bottom: TabBar(controller: _tabController, tabs: [
-          //       Tab(text: "Library"),
-          //       Tab(text: "Search"),
-          //       Tab(text: "Items"),
-          //     ]),
-          //   ),
-          //   body: ChangeNotifierProvider<SearchInputs>(
-          //     create: (BuildContext context) => SearchInputs(),
-          //     builder: (context, _) {
-          //       return TabBarView(
-          //         controller: _tabController,
-          //         children: [
-          //           LibraryScreen(onEnter: _onEnter),
-          //           SearchScreen(onEnter: _onEnter),
-          //           ItemsScreen(),
-          //         ],
-          //       );
-          //     },
-          //   ),
-          // ),
+        return FutureBuilder(
+          future: Firebase.initializeApp(),
+          builder: (context, snapshot) {
+            // Check for errors
+            if (snapshot.hasError) {
+              return FailScreen(snapshot.error.toString());
+            }
+            if (snapshot.connectionState == ConnectionState.done) {
+              return ChangeNotifierProvider(
+                create: (context) => ScreenManager(),
+                builder: (context, _) => MaterialApp(
+                  debugShowCheckedModeBanner: false,
+                  title: 'Digital Library',
+                  theme: ThemeData.dark(),
+                  home: HomePage(),
+                ),
+              );
+            } else {
+              return MaterialApp(
+                title: 'Digital Library',
+                theme: ThemeData.dark(),
+                home: Scaffold(
+                  backgroundColor: Color(0xFF000216),
+                  body: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
+          },
         );
       },
     );
@@ -184,6 +203,7 @@ class _HomePageState extends State<HomePage>
     _tabController = TabController(vsync: this, length: 3);
     FlutterDownloader.registerCallback(downloadCallback);
     getUniLinks();
+    getToken();
   }
 
   void showLoading(bool val) {
@@ -201,7 +221,7 @@ class _HomePageState extends State<HomePage>
         link = urlFromMenu;
       }
       showLoading(true);
-      link = link?.replaceAll(RegExp(r"https?:\/\/bphc.to\/?\?"), '');
+      link = link?.replaceAll(RegExp(r"https?:\/\/bphc.to\/?\?"), '').trim();
       var urlResult = await parseURL(link);
       // print(isFileList);
       if (urlResult == null || urlResult['status'] == 'invalid') {
@@ -411,62 +431,98 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
+    final inMessagesScreen =
+        context.watch<ScreenManager>().screenName != "home";
     return Scaffold(
       backgroundColor: Color(0xFF000216),
+      drawer: CustomDrawer(showLoading, getUniLinks),
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text("  BPHC Digital Library"),
+        // automaticallyImplyLeading: false,
+        title:
+            Text(inMessagesScreen ? "Announcements" : "BPHC Digital Library"),
         backgroundColor: Colors.transparent,
         elevation: 0.0,
         actions: [
-          // Padding(
-          //   padding: const EdgeInsets.only(right: 5.0),
-          //   child: IconButton(
-          //     icon: Icon(Icons.info_outline_rounded),
-          //     onPressed: () {
-          //       infoDialog(context);
-          //     },
-          //   ),
-          // ),
-          //
-          //
-          // Padding(
-          //   padding: const EdgeInsets.only(right: 8.0),
-          //   child: IconButton(
-          //     icon: Icon(Icons.share),
-          //     tooltip: "Share all items",
-          //     onPressed: () {
-          //       showShareDialog(context);
-          //     },
-          //   ),
-          // ),
-          CustomPopUpMenu(showLoading, getUniLinks),
+          if (inMessagesScreen)
+            IconButton(
+                icon: Icon(Icons.info_outline),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text("Announcements"),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                              "Important announcements (like change of schedule, exams) will be posted here in respective channels.\nYou can request a new channel and ask to add posts by sending me an email."),
+                          // ElevatedButton.icon(
+                          //   onPressed: () {
+                          //     final Uri _emailLaunchUri = Uri(
+                          //         scheme: 'mailto',
+                          //         path: 'f20200284@hyderabad.bits-pilani.ac.in',
+                          //         queryParameters: {
+                          //           'subject':
+                          //               'BPHC Digital Library  - New Channel / Post',
+                          //           'body':
+                          //               'Channel name: \n Or\nMake a new post: (add content/link/document)\n'
+                          //         });
+                          //     try {
+                          //       launch(_emailLaunchUri
+                          //           .toString()
+                          //           .replaceAll("+", " "));
+                          //     } catch (e) {
+                          //       ScaffoldMessenger.of(context)
+                          //           .showSnackBar(const SnackBar(
+                          //         content: Text("Could not open"),
+                          //       ));
+                          //     }
+                          //   },
+                          //   icon: Icon(Icons.mail),
+                          //   label: Container(
+                          //       constraints: BoxConstraints(maxWidth: 240),
+                          //       child: Text("Request")),
+                          //   style: ElevatedButton.styleFrom(
+                          //     elevation: 1.0,
+                          //     primary: Color(0xFF343434),
+                          //   ),
+                          // ),
+                        ],
+                      ),
+                    ),
+                  );
+                })
+          // CustomPopUpMenu(showLoading, getUniLinks),
         ],
-        bottom: TabBar(controller: _tabController, tabs: [
-          Tab(text: "Library"),
-          Tab(text: "Search"),
-          Tab(text: "Items"),
-        ]),
+        bottom: context.watch<ScreenManager>().screenName == "home"
+            ? TabBar(controller: _tabController, tabs: [
+                Tab(text: "Library"),
+                Tab(text: "Search"),
+                Tab(text: "Items"),
+              ])
+            : null,
       ),
-      body: ModalProgressHUD(
-        inAsyncCall: this.linkOpened ?? false,
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            LibraryScreen(onEnter: () {
-              _onEnter(2);
-            }),
-            SearchScreen(onEnter: () {
-              _onEnter(2);
-            }),
-            ItemsScreen(
-              returnToLibrary: () {
-                _onEnter(0);
-              },
-            ),
-          ],
-        ),
-      ),
+      body: context.watch<ScreenManager>().screenName == "home"
+          ? ModalProgressHUD(
+              inAsyncCall: this.linkOpened ?? false,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  LibraryScreen(onEnter: () {
+                    _onEnter(2);
+                  }),
+                  SearchScreen(onEnter: () {
+                    _onEnter(2);
+                  }),
+                  ItemsScreen(
+                    returnToLibrary: () {
+                      _onEnter(0);
+                    },
+                  ),
+                ],
+              ),
+            )
+          : MessageScreen(),
     );
   }
 }

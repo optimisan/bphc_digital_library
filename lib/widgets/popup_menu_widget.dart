@@ -1,4 +1,3 @@
-import 'package:bphc_digital_library/screens/book_list_screen.dart';
 import 'package:bphc_digital_library/services/error_logs_service.dart';
 import 'package:bphc_digital_library/services/history_share_service.dart';
 import 'package:bphc_digital_library/services/search_inputs.dart';
@@ -297,8 +296,8 @@ void infoDialog(BuildContext context) {
   );
 }
 
-void showShareDialog(BuildContext context) {
-  showDialog(
+Future<void> showShareDialog(BuildContext context) async {
+  return await showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -358,6 +357,7 @@ void _shareAll(BuildContext context, bool asAppLinks) async {
   final share = await getHistory(asAppLinks);
   Navigator.of(context).pop();
   if (share == null) {
+    Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text("No items to share. Download something first! :)"),
     ));

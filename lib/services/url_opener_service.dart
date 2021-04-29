@@ -10,13 +10,18 @@ import 'download_helper.dart';
 
 Future<Map<String, String?>?> parseURL(String? link) async {
   if (link != null) {
-    final regexp = RegExp(
-        r'http:\/\/125.22.54.221:8080\/jspui\/(handle|bitstream|simple-search)\/?.+');
+    final regexp =
+        RegExp(r'http:\/\/125.22.54.221:8080\/jspui\/(handle|bitstream|simple-search|browse)\/?.+');
     final isValid = regexp.hasMatch(link);
     if (!isValid) {
       return {'status': 'invalid'};
     }
-    var uri = Uri.parse(link);
+    var uri;
+    try {
+      uri = Uri.parse(link);
+    } catch (e) {
+      return {'status': 'error', 'message': 'it\'s not even a valid url what the heck'};
+    }
     final folderName = uri.queryParameters['folder'];
     final paths = uri.pathSegments;
     try {
@@ -30,11 +35,16 @@ Future<Map<String, String?>?> parseURL(String? link) async {
         return {
           'status': 'isDownloadLink',
           'message': 'Download ${paths[paths.length - 1]}?',
-          'folderName':
-              folderName != null ? Uri.decodeComponent(folderName) : null,
+          'folderName': folderName != null ? Uri.decodeComponent(folderName) : null,
         };
       } else if (paths[1] == 'simple-search') {
         return {'status': 'isASearch'};
+      } else {
+        return {
+          'status': 'error',
+          'message':
+              '"browse" links are not yet supported. Only search queries, file lists and downloads are supported. View in the browser instead.'
+        };
       }
     } catch (e) {
       return null;
@@ -42,18 +52,14 @@ Future<Map<String, String?>?> parseURL(String? link) async {
   }
 }
 
-Future<Map<String, String>> checkIf404orNot(String url,
-    {bool isDownloadLink = false}) async {
+Future<Map<String, String>> checkIf404orNot(String url, {bool isDownloadLink = false}) async {
   try {
     final result = await InternetAddress.lookup('example.com');
 
     if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
       final existRes = await head(Uri.parse(url));
       if (existRes.statusCode != 200) {
-        return {
-          'status': 'error',
-          'message': 'the resource does not exist on the server.'
-        };
+        return {'status': 'error', 'message': 'the resource does not exist on the server.'};
       }
       if (isDownloadLink) return {'status': 'success'};
 
@@ -77,22 +83,13 @@ Future<Map<String, String>> checkIf404orNot(String url,
                 'it does not contain any items. Only links which contain items (list of books or the files) are supported by this app.'
           };
       } else {
-        return {
-          'status': 'error',
-          'message': 'the resource does not exist on the server.'
-        };
+        return {'status': 'error', 'message': 'the resource does not exist on the server.'};
       }
     } else {
-      return {
-        'status': 'error',
-        'message': 'the resource does not exist on the server.'
-      };
+      return {'status': 'error', 'message': 'the resource does not exist on the server.'};
     }
   } on SocketException catch (_) {
-    return {
-      'status': 'error',
-      'message': 'your device is not connected to the internet.'
-    };
+    return {'status': 'error', 'message': 'your device is not connected to the internet.'};
   }
 }
 
@@ -125,8 +122,7 @@ Widget getAlertDialog(BuildContext context,
           folderName == null
               ? Text(
                   "Enter the folder name in which you want to save this file (default is 'Downloads')\nEx. Computer Programming_2019-20")
-              : Text(
-                  "File will be saved to the folder $folderName. You can change it here."),
+              : Text("File will be saved to the folder $folderName. You can change it here."),
           SizedBox(height: 15),
           TextField(
             controller: controller,
@@ -136,8 +132,7 @@ Widget getAlertDialog(BuildContext context,
               fillColor: Color(0x557A7A7A),
               filled: true,
               focusColor: Colors.blueGrey,
-              contentPadding:
-                  EdgeInsets.symmetric(vertical: 12.0, horizontal: 18.0),
+              contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 18.0),
               border: OutlineInputBorder(
                 borderRadius: const BorderRadius.all(
                   const Radius.circular(25.0),
@@ -168,8 +163,7 @@ Widget getAlertDialog(BuildContext context,
             try {
               link = link.replaceAll(RegExp(r'\?folder=.+$'), '');
               print("Url is $link");
-              await downloadFromURL(
-                  link.replaceAll("http://125.22.54.221:8080", ''), context,
+              await downloadFromURL(link.replaceAll("http://125.22.54.221:8080", ''), context,
                   folderName: controller.text.trim() == ''
                       ? 'Downloads'
                       : controller.text.replaceAll('\n', ''));
@@ -196,8 +190,7 @@ Widget getAlertDialog(BuildContext context,
 }
 
 class OpenInSearchButton extends StatelessWidget {
-  const OpenInSearchButton({Key? key, required this.folderName, this.onClick})
-      : super(key: key);
+  const OpenInSearchButton({Key? key, required this.folderName, this.onClick}) : super(key: key);
   final String folderName;
   final Function? onClick;
   @override
@@ -205,8 +198,7 @@ class OpenInSearchButton extends StatelessWidget {
     return ElevatedButton.icon(
       onPressed: () async {
         final regex = RegExp(r'_\d+-?\d+');
-        final date =
-            regex.firstMatch(folderName)?.group(0)?.replaceAll("_", '');
+        final date = regex.firstMatch(folderName)?.group(0)?.replaceAll("_", '');
         final name = folderName.replaceAll(RegExp(r'_\d+-?\d+'), '');
         String url = '';
         if (date != null)
@@ -229,8 +221,7 @@ class OpenInSearchButton extends StatelessWidget {
       },
       icon: Icon(Icons.search),
       label: Container(
-          constraints: BoxConstraints(maxWidth: 240),
-          child: Text("Open in search instead")),
+          constraints: BoxConstraints(maxWidth: 240), child: Text("Open in search instead")),
       style: ElevatedButton.styleFrom(
         elevation: 1.0,
         primary: Color(0xFF343434),

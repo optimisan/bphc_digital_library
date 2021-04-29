@@ -59,9 +59,6 @@
                 <data
                 android:scheme="https"
                 android:host="bphc.to" />
-              <data
-                android:scheme="https"
-                android:host="jeenius.ga"/>
             </intent-filter>
             <intent-filter>
               <action android:name="android.intent.action.VIEW" />
