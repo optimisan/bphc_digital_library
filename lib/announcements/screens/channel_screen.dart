@@ -9,8 +9,7 @@ class ChannelScreen extends StatelessWidget {
   final String channelName;
   @override
   Widget build(BuildContext context) {
-    CollectionReference users =
-        FirebaseFirestore.instance.collection(channelName);
+    CollectionReference users = FirebaseFirestore.instance.collection(channelName);
 
     return Scaffold(
       backgroundColor: kBackgroundColor,
@@ -32,20 +31,17 @@ class ChannelScreen extends StatelessWidget {
           if (snapshot.data?.docs.length == 0) {
             return Center(child: const Text("No messages in this channel."));
           }
-          final List<Widget>? list =
-              snapshot.data?.docs.map((DocumentSnapshot document) {
+          final List<Widget>? list = snapshot.data?.docs.map((DocumentSnapshot document) {
             return MessageTile(
               title: document.data()?['title'] ?? 'Message',
-              content:
-                  document.data()?['content']?.replaceAll("\\n", "\n") ?? '',
+              content: document.data()?['content']?.replaceAll("\\n", "\n") ?? '',
               time: document.data()?['time'],
               imageURL: document.data()?['imageURL'],
               author: document.data()?['author'],
             );
             return ListTile(
               title: Text(document.data()?['title'] ?? ''),
-              subtitle: Text(
-                  document.data()?['content']?.replaceAll("#", "\n") ?? ''),
+              subtitle: Text(document.data()?['content']?.replaceAll("#", "\n") ?? ''),
             );
           }).toList();
           list?.insert(
@@ -66,11 +62,7 @@ class ChannelScreen extends StatelessWidget {
 
 class MessageTile extends StatefulWidget {
   const MessageTile(
-      {required this.title,
-      required this.content,
-      this.imageURL,
-      this.time,
-      this.author});
+      {required this.title, required this.content, this.imageURL, this.time, this.author});
   final String title;
   final String content;
   final String? time;
@@ -96,6 +88,7 @@ class _MessageTileState extends State<MessageTile> {
                 content: widget.content,
                 time: widget.time,
                 imageUrl: widget.imageURL,
+                author: widget.author,
               ),
             ),
           );

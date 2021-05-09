@@ -31,8 +31,7 @@ class SearchScreen extends StatelessWidget {
                     onEnter();
                     try {
                       final result = await InternetAddress.lookup('google.com');
-                      if (result.isNotEmpty &&
-                          result[0].rawAddress.isNotEmpty) {
+                      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
                         print('connected');
                         print("$value");
                         await Provider.of<SearchInputs>(context, listen: false)
@@ -53,8 +52,7 @@ class SearchScreen extends StatelessWidget {
                   fillColor: Color(0x557A7A7A),
                   filled: true,
                   focusColor: Colors.blueGrey,
-                  contentPadding:
-                      EdgeInsets.symmetric(vertical: 15.0, horizontal: 18.0),
+                  contentPadding: EdgeInsets.symmetric(vertical: 15.0, horizontal: 18.0),
                   border: OutlineInputBorder(
                     borderRadius: const BorderRadius.all(
                       const Radius.circular(25.0),
@@ -100,12 +98,9 @@ class SearchScreen extends StatelessWidget {
                       text:
                           "Enter your search term and tap the search/go icon in your keyboard to search. Alternatively, click on the quick search buttons above.",
                       children: [
+                        TextSpan(text: '\nUse the course code for accurate results: '),
                         TextSpan(
-                            text:
-                                '\nUse the course code for accurate results: '),
-                        TextSpan(
-                            text: "CS F111, CHEM F111",
-                            style: TextStyle(color: Colors.tealAccent)),
+                            text: "CS F111, CHEM F111", style: TextStyle(color: Colors.tealAccent)),
                       ]),
                 ),
               ),
@@ -181,8 +176,7 @@ class _SubjectChipsState extends State<SubjectChips> {
                     print('connected');
 
                     await Provider.of<SearchInputs>(context, listen: false)
-                        .updateSubjectSearch(
-                            kFirstYearSubjects[index]['url'] ?? 'Error');
+                        .updateSubjectSearch(kFirstYearSubjects[index]['url'] ?? 'Error');
                   }
                 } on SocketException catch (_) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -208,6 +202,7 @@ class RecentChips extends StatefulWidget {
 class _RecentChipsState extends State<RecentChips> {
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width - 130;
     return FutureBuilder(
       future: Hive.openBox<String>('recents'),
       builder: (BuildContext context, AsyncSnapshot snapshot) {
@@ -240,62 +235,59 @@ class _RecentChipsState extends State<RecentChips> {
                             boxContents.values.length,
                             (int index) {
                               String searchStr = boxContents.getAt(index) ?? '';
-                              return InkWell(
-                                // padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                child: Container(
-                                  margin: const EdgeInsets.all(8.0),
-                                  padding: EdgeInsets.only(
-                                      left: 15, top: 2, bottom: 2, right: 4),
-                                  decoration: BoxDecoration(
-                                    color: Color(0x77676767),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                          constraints:
-                                              BoxConstraints(minWidth: 14),
-                                          child: Text(searchStr)),
-                                      SizedBox(width: 8),
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: InkWell(
-                                          child: Icon(Icons.close, size: 20),
-                                          onTap: () {
-                                            final box =
-                                                Hive.box<String>('recents');
-                                            box.deleteAt(index);
-                                          },
+                              return Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: InkWell(
+                                  // padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  child: Container(
+                                    // margin: const EdgeInsets.all(8.0),
+                                    padding: EdgeInsets.only(left: 15, top: 2, bottom: 2, right: 4),
+                                    decoration: BoxDecoration(
+                                      color: Color(0x77676767),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                            constraints:
+                                                BoxConstraints(minWidth: 14, maxWidth: width),
+                                            child: Text(Uri.decodeComponent(searchStr)
+                                                .replaceAll("+", ' '))),
+                                        SizedBox(width: 8),
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: InkWell(
+                                            child: Icon(Icons.close, size: 20),
+                                            onTap: () {
+                                              final box = Hive.box<String>('recents');
+                                              box.deleteAt(index);
+                                            },
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                onTap: () async {
-                                  // setState(() {
-                                  //   _value = selected ? index : null;
-                                  // });
-                                  widget.onEnter();
-                                  try {
-                                    final result = await InternetAddress.lookup(
-                                        'example.com');
-                                    if (result.isNotEmpty &&
-                                        result[0].rawAddress.isNotEmpty) {
-                                      print('connected');
+                                  onTap: () async {
+                                    // setState(() {
+                                    //   _value = selected ? index : null;
+                                    // });
+                                    widget.onEnter();
+                                    try {
+                                      final result = await InternetAddress.lookup('example.com');
+                                      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+                                        print('connected');
 
-                                      await Provider.of<SearchInputs>(context,
-                                              listen: false)
-                                          .updateSubjectSearch(searchStr);
+                                        await Provider.of<SearchInputs>(context, listen: false)
+                                            .updateSubjectSearch(searchStr);
+                                      }
+                                    } on SocketException catch (_) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                        content: Text("Not connected to internet"),
+                                      ));
                                     }
-                                  } on SocketException catch (_) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(SnackBar(
-                                      content:
-                                          Text("Not connected to internet"),
-                                    ));
-                                  }
-                                },
+                                  },
+                                ),
                               );
                             },
                           ).toList(),

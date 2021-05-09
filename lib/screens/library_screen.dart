@@ -1,22 +1,26 @@
+// Item names in storage are url encoded. Decode to display
+
 import 'dart:io';
 
-import 'package:android_path_provider/android_path_provider.dart';
-import 'package:bphc_digital_library/services/error_logs_service.dart';
 import 'package:bphc_digital_library/services/history_share_service.dart';
 import 'package:bphc_digital_library/services/search_inputs.dart';
+import 'package:bphc_digital_library/todo/screens/todo_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:bphc_digital_library/services/download_helper.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:bphc_digital_library/library_screen/book_models.dart';
 import 'package:share/share.dart';
+import 'package:watcher/watcher.dart';
+import 'package:bphc_digital_library/library_screen/UI_library.dart';
 
 List<FileSystemEntity> files = [];
 List<Book> books = [];
 // Directory? externalDir;
 String? externalDir;
 
-///To remove the inital path to the file/directory
+///To remove the initial path to the file/directory
 RegExp initRegExp = new RegExp(
   r"(\/.+\/BPHC_Downloads\/)|(_\d+\-?.*)",
   caseSensitive: true,
@@ -27,32 +31,6 @@ RegExp regexpForFolder = RegExp(
   r'\/.+\/BPHC_Downloads\/',
   caseSensitive: true,
 );
-
-class Book {
-  const Book(
-      {required this.title,
-      required this.path,
-      required this.issueDate,
-      required this.items});
-  final String title;
-  final String path;
-  final String? issueDate;
-  final List<Item> items;
-}
-
-class Item {
-  const Item({required this.title, required this.path, required this.size});
-  final String title;
-  final String path;
-  final int size;
-  // final int size;
-}
-
-Item toItem(FileSystemEntity e) {
-  final name = e.path.replaceAll(RegExp(r'\/.+\/'), '');
-  final size = e.statSync().size;
-  return Item(title: name, path: e.path, size: size);
-}
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({Key? key, required this.onEnter}) : super(key: key);
@@ -68,7 +46,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     getFiles();
   }
 
-  Widget toListTile(Item item) {
+  Widget _toListTile(Item item) {
     return ListTile(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
       tileColor: Color(0x33000000),
@@ -124,7 +102,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       print(bookTitles[i]);
       final bookT = bookTitles[i];
       final date = RegExp(r'_\d+\-?.*').firstMatch(bookT)?.group(0);
-      final items = Directory(bookT).listSync().map((e) => toItem(e)).toList();
+      final items = Directory(bookT).listSync().map((e) => e.toItem).toList();
       print(items.toString());
 
       books.add(Book(
@@ -146,19 +124,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
         await Directory('$externalDir/BPHC_Downloads').create();
         final filesHere = Directory('$externalDir/BPHC_Downloads').listSync();
         files = filesHere;
-
         createTree();
         setState(() {});
       }
     }
   }
 
+  //TODO: Use StreamBuilder instead for live updates
   @override
   Widget build(BuildContext context) {
     final showInLibrary = Provider.of<SearchInputs>(context).showInLibraryTitle;
     final dir = Provider.of<SearchInputs>(context).externalDir;
     if (dir != externalDir) {
-      //this is so that this screen is rebuilt whe provider changes
+      //this is so that this screen is rebuilt when provider changes
       externalDir = dir;
       getFiles();
     }
@@ -167,7 +145,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return Stack(alignment: Alignment.center, children: [
         ListView.builder(
           itemBuilder: (context, index) {
-            final items = books[index].items.map((e) => toListTile(e)).toList();
+            final items = books[index]
+                .items
+                .map((e) => e.toListTile(context, () {
+                      setState(() {
+                        getFiles();
+                      });
+                    }))
+                .toList();
             if (items.length == 0) {
               items.add(Text("No Items here."));
             }
@@ -229,7 +214,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
             )),
       ]);
     } else
-      return Center(child: Text("Downloaded items will show up here."));
+      // return Center(child: Text("Downloaded items will show up here."));
+      return NothingToShow('library',
+          displayStr: "Downloaded items will show up here.");
   }
 
   String provideSearchString(Book book) {
@@ -275,19 +262,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
         children: [
           deleteBookButton(bookName: bookName, path: path, context: context),
-          // ElevatedButton(
-          //     onPressed: () async {
-          //       widget.onEnter();
-          //       await Provider.of<SearchInputs>(context, listen: false)
-          //           .updateSubjectSearch(searchStr);
-          //     },
-          //     child: Row(
-          //       mainAxisSize: MainAxisSize.min,
-          //       children: [
-          //         Text("Browse"),
-          //         Icon(Icons.open_in_new_sharp),
-          //       ],
-          //     ))
           OutlinedButton.icon(
             onPressed: () async {
               if (!(await checkInternet())) {
@@ -320,43 +294,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
     );
   }
-  // @override
-  // Widget build(BuildContext context) {
-  //   return ChangeNotifierProvider<FileList>(
-  //     create: (context) => FileList(),
-  //     builder: (context, _) => ListView.builder(
-  //       itemBuilder: (context, index) {
-  //         return ListTile(
-  //           title: Text(files[index].path),
-  //           onTap: () async {
-  //             final result = await OpenFile.open(files[index].path);
-  //           },
-  //           trailing: IconButton(
-  //             onPressed: () async {
-  //               try {
-  //                 final file = File(files[index].path);
-  //                 await confirmDialog(file, context, () {
-  //                   final filesHere =
-  //                       Directory('${externalDir?.path}/BPHC_Downloads')
-  //                           .listSync();
-  //                   setState(() {
-  //                     files = filesHere;
-  //                   });
-  //                 });
-  //                 // setState(() {});
-  //               } catch (e) {
-  //                 print(e.toString());
-  //               }
-  //             },
-  //             icon: Icon(Icons.delete),
-  //             color: Colors.redAccent,
-  //           ),
-  //         );
-  //       },
-  //       itemCount: files.length,
-  //     ),
-  //   );
-  // }
 }
 
 Future<void> confirmDialog(

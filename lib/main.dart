@@ -1,13 +1,17 @@
 import 'dart:io';
 
 import 'package:android_path_provider/android_path_provider.dart';
-import 'package:bphc_digital_library/announcements/screens/display_message_screen.dart';
 import 'package:bphc_digital_library/announcements/screens/messages_screen.dart';
+import 'package:bphc_digital_library/routes.dart';
 import 'package:bphc_digital_library/screen_provider.dart';
 import 'package:bphc_digital_library/screens/book_list_screen.dart';
 import 'package:bphc_digital_library/screens/search_screen.dart';
 import 'package:bphc_digital_library/services/firebase_messaging_service.dart';
 import 'package:bphc_digital_library/services/search_inputs.dart';
+import 'package:bphc_digital_library/todo/screens/todo_editor_screen.dart';
+import 'package:bphc_digital_library/todo/services/todo_model.dart';
+import 'package:bphc_digital_library/todo/screens/todo_screen.dart';
+import 'package:bphc_digital_library/todo/widgets/bottom_nav_bar_widget.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -19,20 +23,24 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'library_screen/list_files.dart';
 import 'screens/library_screen.dart';
 import 'screens/items_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:uni_links2/uni_links.dart';
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:timezone/data/latest.dart' as tz;
 
 import 'widgets/side_drawer_widget.dart';
 
 late final String externalDir;
 late SharedPreferences prefs;
+final GlobalKey<ScaffoldState> mainScaffoldKey = GlobalKey<ScaffoldState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
+    Hive.registerAdapter(TodoItemAdapter());
     await FlutterDownloader.initialize(
         debug: true // optional: set false to disable printing logs to console
         );
@@ -113,6 +121,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    tz.initializeTimeZones();
     _tabController = TabController(vsync: this, length: 3);
     var sett = AndroidInitializationSettings('@mipmap/ic_launcher');
     var sett2 = InitializationSettings(android: sett);
@@ -160,13 +169,26 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
               return FailScreen(snapshot.error.toString());
             }
             if (snapshot.connectionState == ConnectionState.done) {
-              return ChangeNotifierProvider(
-                create: (context) => ScreenManager(),
-                builder: (context, _) => MaterialApp(
+              return MultiProvider(
+                providers: [
+                  ChangeNotifierProvider(
+                    create: (_) => ScreenManager(),
+                  ),
+                  ChangeNotifierProvider(
+                    create: (_) => FileListing(context),
+                  ),
+                ],
+                child: MaterialApp(
                   debugShowCheckedModeBanner: false,
                   title: 'Digital Library',
                   theme: ThemeData.dark(),
-                  home: HomePage(),
+                  initialRoute: '/',
+                  onGenerateRoute: GenerateRoute.generateRoute,
+                  routes: {
+                    '/': (_) => HomePage(),
+                    // '/add_todo': (_) => AddTodoScreen(),
+                  },
+                  // home: HomePage(),
                 ),
               );
             } else {
@@ -431,31 +453,34 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    final inMessagesScreen =
-        context.watch<ScreenManager>().screenName != "home";
+    final screenName = context.watch<ScreenManager>().screenName;
     return Scaffold(
+      key: mainScaffoldKey,
       backgroundColor: Color(0xFF000216),
       drawer: CustomDrawer(showLoading, getUniLinks),
       appBar: AppBar(
         // automaticallyImplyLeading: false,
-        title:
-            Text(inMessagesScreen ? "Announcements" : "BPHC Digital Library"),
+        title: Text(screenName == "messages"
+            ? "News And Resources"
+            : screenName == "todo"
+                ? "To Do"
+                : "BPHC Digital Library"),
         backgroundColor: Colors.transparent,
         elevation: 0.0,
         actions: [
-          if (inMessagesScreen)
+          if (screenName == "messages")
             IconButton(
                 icon: Icon(Icons.info_outline),
                 onPressed: () {
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: Text("Announcements"),
+                      title: Text("News and Resources"),
                       content: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                              "Important announcements (like change of schedule, exams) will be posted here in respective channels.\nYou can request a new channel and ask to add posts by sending me an email."),
+                              "Important announcements (like change of schedule, exams) will be posted here in respective channels.\n\nResources (like notes/slides/other helpful things) will be in the resources channels\n\nYou can request a new channel and ask to add posts by sending me an email."),
                           // ElevatedButton.icon(
                           //   onPressed: () {
                           //     final Uri _emailLaunchUri = Uri(
@@ -494,7 +519,7 @@ class _HomePageState extends State<HomePage>
                 })
           // CustomPopUpMenu(showLoading, getUniLinks),
         ],
-        bottom: context.watch<ScreenManager>().screenName == "home"
+        bottom: screenName == "home"
             ? TabBar(controller: _tabController, tabs: [
                 Tab(text: "Library"),
                 Tab(text: "Search"),
@@ -502,7 +527,7 @@ class _HomePageState extends State<HomePage>
               ])
             : null,
       ),
-      body: context.watch<ScreenManager>().screenName == "home"
+      body: screenName == "home"
           ? ModalProgressHUD(
               inAsyncCall: this.linkOpened ?? false,
               child: TabBarView(
@@ -522,7 +547,19 @@ class _HomePageState extends State<HomePage>
                 ],
               ),
             )
-          : MessageScreen(),
+          : screenName == "messages"
+              ? MessageScreen()
+              : TodoScreen(),
+      // floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+      floatingActionButton: screenName == "todo"
+          ? FloatingActionButton(
+              backgroundColor: Color(0xFF03DAC6),
+              child: Icon(Icons.add),
+              onPressed: () {
+                Navigator.of(context).pushNamed('/todo_editor');
+              })
+          : null,
+      bottomNavigationBar: screenName == "todo" ? TasksBottomNavBar() : null,
     );
   }
 }

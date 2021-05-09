@@ -1,10 +1,9 @@
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+
 const List<String> kYears = ['First', 'Second', 'Third', 'Fourth'];
-const List<List<String>> kYearSubjects = [
-  ['a'],
-  ['b']
-];
+const kTealAccent = Color(0xFF03DAC6);
 const kBackgroundColor = Color(0xFF000216);
 // const Map<String, Map<String, String>> courses = {'as': 'as'};
 List<Map<String, String>> kFirstYearSubjects = [
@@ -23,3 +22,8 @@ List<Map<String, String>> kFirstYearSubjects = [
   {'name': 'Technical report writing', 'url': 'BITS F112'},
   {'name': 'Workshop Practice', 'url': 'ME F112'},
 ];
+
+final ButtonStyle kButtonStyle = ElevatedButton.styleFrom(
+  elevation: 1.0,
+  primary: Color(0xFF343434),
+);

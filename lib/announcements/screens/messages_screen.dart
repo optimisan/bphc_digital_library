@@ -1,12 +1,12 @@
 import 'package:bphc_digital_library/announcements/screens/channel_screen.dart';
+import 'package:bphc_digital_library/todo/screens/todo_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MessageScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    CollectionReference users =
-        FirebaseFirestore.instance.collection('all-collections');
+    CollectionReference users = FirebaseFirestore.instance.collection('all-collections');
 
     return StreamBuilder<QuerySnapshot>(
       stream: users.snapshots(),
@@ -19,14 +19,17 @@ class MessageScreen extends StatelessWidget {
           return Center(child: CircularProgressIndicator());
         }
         if (snapshot.data?.docs.length == 0) {
-          return Center(child: const Text("No messages here."));
+          // return Center(child: const Text("No messages here."));
+          return NothingToShow(
+            'library',
+            displayStr: 'No internet',
+          );
         }
 
         return ListView(
           children: snapshot.data?.docs.map((DocumentSnapshot document) {
                 return ChannelTile(
-                    title: document.data()?['name'] ?? '',
-                    info: document.data()?['info']);
+                    title: document.data()?['name'] ?? '', info: document.data()?['info']);
                 return ListTile(
                   title: Text(document.data()?['name'] ?? ''),
                   subtitle: Text(document.data()?['info'] ?? ''),

@@ -1,6 +1,7 @@
 import 'package:bphc_digital_library/screens/book_list_screen.dart';
 import 'package:bphc_digital_library/services/search_inputs.dart';
 import 'package:bphc_digital_library/services/search_results_service.dart';
+import 'package:bphc_digital_library/todo/screens/todo_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -62,7 +63,9 @@ class ItemsScreen extends StatelessWidget {
         ],
       ));
     } else {
-      return Center(child: Text("Search results will show up here"));
+      // return Center(child: Text("Search results will show up here"));
+      return NothingToShow('search',
+          displayStr: "Search results will show up here");
     }
   }
 }

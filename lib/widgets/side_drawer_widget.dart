@@ -43,12 +43,11 @@ class CustomDrawer extends StatelessWidget {
                       image: DecorationImage(
                         image: AssetImage("assets/images/background.png"),
                         fit: BoxFit.cover,
-                        colorFilter: ColorFilter.mode(
-                            Colors.black.withOpacity(0.5), BlendMode.srcOver),
+                        colorFilter:
+                            ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.srcOver),
                       ),
                     ),
-                    accountName: Text("BPHC Digital Library",
-                        style: TextStyle(fontSize: 20)),
+                    accountName: Text("BPHC Digital Library", style: TextStyle(fontSize: 20)),
                     accountEmail: Text("For the students of BPHC"),
                     // accountEmail: Text(
                     //   'User: ${prefs.getInt('uid')}',
@@ -116,7 +115,18 @@ class CustomDrawer extends StatelessWidget {
                     context.read<ScreenManager>().updateScreen('messages');
                   },
                   title: const Text(
-                    "Announcements",
+                    "News and Resources",
+                    style: const TextStyle(color: const Color(0xFFFEFEFE)),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(Icons.check_box_outlined, color: Colors.tealAccent),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    context.read<ScreenManager>().updateScreen('todo');
+                  },
+                  title: const Text(
+                    "To Do",
                     style: const TextStyle(color: const Color(0xFFFEFEFE)),
                   ),
                 ),
@@ -188,8 +198,7 @@ Future<void> showLinkDialog(BuildContext context) async {
                 fillColor: Color(0x557A7A7A),
                 filled: true,
                 focusColor: Colors.blueGrey,
-                contentPadding:
-                    EdgeInsets.symmetric(vertical: 12.0, horizontal: 18.0),
+                contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 18.0),
                 border: OutlineInputBorder(
                   borderRadius: const BorderRadius.all(
                     const Radius.circular(25.0),
