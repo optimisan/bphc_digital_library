@@ -1,6 +1,8 @@
 # bphc_digital_library
 
-A mobile client for BPHC DSpace
+A mobile client for BPHC DSpace. A cleaner UI to view and download papers from the DSpace and organize tasks with reminders. 
+
+Download from Google Play: https://play.google.com/store/apps/details?id=com.akshat.bphc_digital_library
 
 ## Getting Started
 
